@@ -1,6 +1,6 @@
 @CashFlow.TransactionService.API_HostAddress = http://localhost:5006
 
-GET {{CashFlow.TransactionService.API_HostAddress}}/weatherforecast/
+GET {{CashFlow.TransactionService.API_HostAddress}}/health/
 Accept: application/json
 
 ###
