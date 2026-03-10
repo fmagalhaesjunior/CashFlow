@@ -9,15 +9,18 @@ namespace CashFlow.TransactionService.Infra.Messaging.RabbitMq;
 public sealed class RabbitMqIntegrationEventPublisher : IIntegrationEventPublisher, IDisposable
 {
     private readonly RabbitMqOptions _options;
+    private readonly IEventRoutingKeyResolver _routingKeyResolver;
     private readonly ILogger<RabbitMqIntegrationEventPublisher> _logger;
     private readonly IConnection _connection;
     private readonly IChannel _channel;
 
     public RabbitMqIntegrationEventPublisher(
         IOptions<RabbitMqOptions> options,
+        IEventRoutingKeyResolver routingKeyResolver,
         ILogger<RabbitMqIntegrationEventPublisher> logger)
     {
         _options = options.Value;
+        _routingKeyResolver = routingKeyResolver;
         _logger = logger;
 
         var factory = new ConnectionFactory
@@ -39,31 +42,40 @@ public sealed class RabbitMqIntegrationEventPublisher : IIntegrationEventPublish
             autoDelete: false).GetAwaiter().GetResult();
     }
 
-    public async Task PublishAsync(
-        string eventType,
-        string payload,
-        CancellationToken cancellationToken)
+    public async Task PublishAsync(PublishEnvelope envelope, CancellationToken cancellationToken)
     {
-        var body = Encoding.UTF8.GetBytes(payload);
+        var routingKey = _routingKeyResolver.Resolve(envelope.EventType);
+        var body = Encoding.UTF8.GetBytes(envelope.Payload);
 
         var properties = new BasicProperties
         {
             Persistent = true,
             ContentType = "application/json",
-            Type = eventType
+            Type = envelope.EventType,
+            MessageId = envelope.EventId.ToString(),
+            CorrelationId = envelope.CorrelationId,
+            Headers = new Dictionary<string, object?>
+            {
+                ["event_id"] = envelope.EventId.ToString(),
+                ["event_type"] = envelope.EventType,
+                ["correlation_id"] = envelope.CorrelationId ?? string.Empty
+            }
         };
 
         await _channel.BasicPublishAsync(
             exchange: _options.ExchangeName,
-            routingKey: _options.RoutingKey,
+            routingKey: routingKey,
             mandatory: false,
             basicProperties: properties,
             body: body,
             cancellationToken: cancellationToken);
 
         _logger.LogInformation(
-            "Outbox event published to RabbitMQ. EventType: {EventType}",
-            eventType);
+            "Event published to RabbitMQ. EventId: {EventId}, EventType: {EventType}, RoutingKey: {RoutingKey}, CorrelationId: {CorrelationId}",
+            envelope.EventId,
+            envelope.EventType,
+            routingKey,
+            envelope.CorrelationId);
     }
 
     public void Dispose()

@@ -4,5 +4,6 @@ public enum OutboxStatus : short
 {
     Pending = 1,
     Processed = 2,
-    Failed = 3
+    Failed = 3,
+    DeadLettered = 4
 }

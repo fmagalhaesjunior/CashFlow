@@ -1,6 +1,7 @@
 ﻿using CashFlow.TransactionService.Application.Abstractions.Outbox;
 using CashFlow.TransactionService.Application.Outbox;
 using CashFlow.TransactionService.Infra.Persistence;
+using CashFlow.TransactionService.Infra.Persistence.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace CashFlow.TransactionService.Infra.Repositories;
@@ -21,7 +22,8 @@ public sealed class OutboxRepository : IOutboxRepository
     {
         return await _dbContext.OutboxEvents
             .Where(x =>
-                !x.Processed &&
+                (x.Status == OutboxStatus.Pending || x.Status == OutboxStatus.Failed) &&
+                !x.IsDeadLettered &&
                 (x.NextAttemptAt == null || x.NextAttemptAt <= utcNow))
             .OrderBy(x => x.CreatedAt)
             .Take(batchSize)
@@ -30,8 +32,10 @@ public sealed class OutboxRepository : IOutboxRepository
                 Id = x.Id,
                 EventType = x.EventType,
                 Payload = x.Payload,
+                CorrelationId = x.CorrelationId,
                 RetryCount = x.RetryCount,
                 CreatedAt = x.CreatedAt,
+                OccurredOnUtc = x.OccurredOnUtc,
                 NextAttemptAt = x.NextAttemptAt
             })
             .ToListAsync(cancellationToken);
@@ -59,5 +63,18 @@ public sealed class OutboxRepository : IOutboxRepository
             .FirstAsync(x => x.Id == id, cancellationToken);
 
         entity.RegisterFailure(error, attemptedAt, nextAttemptAt);
+        entity.Requeue(nextAttemptAt);
+    }
+
+    public async Task MarkAsDeadLetteredAsync(
+        Guid id,
+        string error,
+        DateTime attemptedAt,
+        CancellationToken cancellationToken)
+    {
+        var entity = await _dbContext.OutboxEvents
+            .FirstAsync(x => x.Id == id, cancellationToken);
+
+        entity.MarkAsDeadLettered(error, attemptedAt);
     }
 }

@@ -5,13 +5,16 @@ namespace CashFlow.TransactionService.API.Mappers;
 
 public static class TransactionRequestMapper
 {
-    public static CreateTransactionCommand ToCommand(CreateTransactionRequest request)
+    public static CreateTransactionCommand ToCommand(
+        CreateTransactionRequest request,
+        string? correlationId)
     {
         return new CreateTransactionCommand
         {
             Amount = request.Amount,
             Type = request.Type,
-            Description = request.Description
+            Description = request.Description,
+            CorrelationId = correlationId
         };
     }
 }

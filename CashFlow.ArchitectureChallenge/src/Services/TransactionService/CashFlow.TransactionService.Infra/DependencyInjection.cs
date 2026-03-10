@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<IOutboxWriter, EfCoreOutboxWriter>();
 
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+        services.AddSingleton<IEventRoutingKeyResolver, EventRoutingKeyResolver>();
         services.AddSingleton<IIntegrationEventPublisher, RabbitMqIntegrationEventPublisher>();
 
         services.AddHostedService<OutboxPublisherWorker>();

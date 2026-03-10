@@ -11,25 +11,27 @@ public static class TransactionEndpoints
     public static IEndpointRouteBuilder MapTransactionEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/transactions", async (
+            HttpContext httpContext,
             CreateTransactionRequest request,
             IValidator<CreateTransactionCommand> validator,
             ICommandHandler<CreateTransactionCommand, CreateTransactionResponse> handler,
             CancellationToken cancellationToken) =>
         {
-            var command = TransactionRequestMapper.ToCommand(request);
+            var correlationId = httpContext.Request.Headers["X-Correlation-Id"].FirstOrDefault()
+                ?? Guid.NewGuid().ToString("N");
+
+            var command = TransactionRequestMapper.ToCommand(request, correlationId);
 
             await validator.ValidateAndThrowAsync(command, cancellationToken);
 
             var response = await handler.Handle(command, cancellationToken);
 
+            httpContext.Response.Headers["X-Correlation-Id"] = correlationId;
+
             return Results.Created($"/transactions/{response.TransactionId}", response);
         })
         .WithName("CreateTransaction")
-        .WithTags("Transactions")
-        .Produces<CreateTransactionResponse>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status400BadRequest)
-        .Produces(StatusCodes.Status422UnprocessableEntity)
-        .Produces(StatusCodes.Status500InternalServerError);
+        .WithTags("Transactions");
 
         return endpoints;
     }

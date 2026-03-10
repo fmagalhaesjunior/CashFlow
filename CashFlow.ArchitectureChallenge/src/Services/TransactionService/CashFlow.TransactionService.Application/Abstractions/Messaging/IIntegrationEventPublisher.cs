@@ -2,8 +2,5 @@
 
 public interface IIntegrationEventPublisher
 {
-    Task PublishAsync(
-        string eventType,
-        string payload,
-        CancellationToken cancellationToken);
+    Task PublishAsync(PublishEnvelope envelope, CancellationToken cancellationToken);
 }

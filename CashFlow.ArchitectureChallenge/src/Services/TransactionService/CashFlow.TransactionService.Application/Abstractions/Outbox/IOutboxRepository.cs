@@ -20,4 +20,10 @@ public interface IOutboxRepository
         DateTime attemptedAt,
         DateTime nextAttemptAt,
         CancellationToken cancellationToken);
+
+    Task MarkAsDeadLetteredAsync(
+        Guid id,
+        string error,
+        DateTime attemptedAt,
+        CancellationToken cancellationToken);
 }

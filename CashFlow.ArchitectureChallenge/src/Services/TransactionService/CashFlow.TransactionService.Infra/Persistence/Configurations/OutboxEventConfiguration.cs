@@ -25,12 +25,21 @@ public sealed class OutboxEventConfiguration : IEntityTypeConfiguration<OutboxEv
             .HasColumnType("jsonb")
             .IsRequired();
 
+        builder.Property(x => x.OccurredOnUtc)
+            .HasColumnName("occurred_on_utc")
+            .IsRequired();
+
         builder.Property(x => x.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
 
-        builder.Property(x => x.Processed)
-            .HasColumnName("processed")
+        builder.Property(x => x.CorrelationId)
+            .HasColumnName("correlation_id")
+            .HasMaxLength(100);
+
+        builder.Property(x => x.Status)
+            .HasColumnName("status")
+            .HasConversion<short>()
             .IsRequired();
 
         builder.Property(x => x.ProcessedAt)
@@ -50,10 +59,10 @@ public sealed class OutboxEventConfiguration : IEntityTypeConfiguration<OutboxEv
         builder.Property(x => x.NextAttemptAt)
             .HasColumnName("next_attempt_at");
 
-        builder.HasIndex(x => new { x.Processed, x.CreatedAt })
-            .HasDatabaseName("ix_outbox_events_processed_created_at");
+        builder.HasIndex(x => new { x.Status, x.NextAttemptAt })
+            .HasDatabaseName("ix_outbox_events_status_next_attempt_at");
 
-        builder.HasIndex(x => new { x.Processed, x.NextAttemptAt })
-            .HasDatabaseName("ix_outbox_events_processed_next_attempt_at");
+        builder.HasIndex(x => x.CorrelationId)
+            .HasDatabaseName("ix_outbox_events_correlation_id");
     }
 }
