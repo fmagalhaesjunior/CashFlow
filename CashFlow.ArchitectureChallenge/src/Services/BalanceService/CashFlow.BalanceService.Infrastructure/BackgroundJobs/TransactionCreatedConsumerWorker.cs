@@ -1,5 +1,7 @@
-﻿using CashFlow.BalanceService.Application.UseCases.ProcessTransactionCreated;
+﻿using CashFlow.BalanceService.Application.Exceptions;
+using CashFlow.BalanceService.Application.UseCases.ProcessTransactionCreated;
 using CashFlow.BalanceService.Infrastructure.Messaging.RabbitMq;
+using CashFlow.BalanceService.Infrastructure.Observability;
 using CashFlow.BuildingBlocks.Contracts.Events;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -7,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 
@@ -17,6 +20,8 @@ public sealed class TransactionCreatedConsumerWorker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly RabbitMqConsumerOptions _options;
     private readonly ILogger<TransactionCreatedConsumerWorker> _logger;
+    private readonly IConsumerFailurePublisher _failurePublisher;
+    private readonly BalanceConsumerMetrics _metrics;
 
     private IConnection? _connection;
     private IChannel? _channel;
@@ -24,11 +29,15 @@ public sealed class TransactionCreatedConsumerWorker : BackgroundService
     public TransactionCreatedConsumerWorker(
         IServiceScopeFactory scopeFactory,
         IOptions<RabbitMqConsumerOptions> options,
-        ILogger<TransactionCreatedConsumerWorker> logger)
+        ILogger<TransactionCreatedConsumerWorker> logger,
+        IConsumerFailurePublisher failurePublisher,
+        BalanceConsumerMetrics metrics)
     {
         _scopeFactory = scopeFactory;
         _options = options.Value;
         _logger = logger;
+        _failurePublisher = failurePublisher;
+        _metrics = metrics;
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -45,12 +54,9 @@ public sealed class TransactionCreatedConsumerWorker : BackgroundService
         _connection = await factory.CreateConnectionAsync(cancellationToken);
         _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
 
-        await _channel.ExchangeDeclareAsync(
-            exchange: _options.ExchangeName,
-            type: ExchangeType.Direct,
-            durable: true,
-            autoDelete: false,
-            cancellationToken: cancellationToken);
+        await _channel.ExchangeDeclareAsync(_options.ExchangeName, ExchangeType.Direct, durable: true, autoDelete: false, cancellationToken: cancellationToken);
+        await _channel.ExchangeDeclareAsync(_options.RetryExchangeName, ExchangeType.Direct, durable: true, autoDelete: false, cancellationToken: cancellationToken);
+        await _channel.ExchangeDeclareAsync(_options.DeadLetterExchangeName, ExchangeType.Direct, durable: true, autoDelete: false, cancellationToken: cancellationToken);
 
         await _channel.QueueDeclareAsync(
             queue: _options.QueueName,
@@ -60,11 +66,29 @@ public sealed class TransactionCreatedConsumerWorker : BackgroundService
             arguments: null,
             cancellationToken: cancellationToken);
 
-        await _channel.QueueBindAsync(
-            queue: _options.QueueName,
-            exchange: _options.ExchangeName,
-            routingKey: _options.RoutingKey,
+        await _channel.QueueDeclareAsync(
+            queue: _options.RetryQueueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: new Dictionary<string, object?>
+            {
+                ["x-dead-letter-exchange"] = _options.ExchangeName,
+                ["x-dead-letter-routing-key"] = _options.RoutingKey
+            },
             cancellationToken: cancellationToken);
+
+        await _channel.QueueDeclareAsync(
+            queue: _options.DeadLetterQueueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null,
+            cancellationToken: cancellationToken);
+
+        await _channel.QueueBindAsync(_options.QueueName, _options.ExchangeName, _options.RoutingKey, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_options.RetryQueueName, _options.RetryExchangeName, _options.RetryRoutingKey, cancellationToken: cancellationToken);
+        await _channel.QueueBindAsync(_options.DeadLetterQueueName, _options.DeadLetterExchangeName, _options.DeadLetterRoutingKey, cancellationToken: cancellationToken);
 
         await _channel.BasicQosAsync(
             prefetchSize: 0,
@@ -91,14 +115,21 @@ public sealed class TransactionCreatedConsumerWorker : BackgroundService
 
             var eventId = ea.BasicProperties?.MessageId;
             var correlationId = ea.BasicProperties?.CorrelationId;
+            var eventType = ea.BasicProperties?.Type ?? "unknown";
+            var retryCount = RabbitMqHeaderReader.GetConsumerRetryCount(ea.BasicProperties);
+
+            var startedAt = Stopwatch.GetTimestamp();
 
             try
             {
+                _metrics.RecordMessageReceived();
+
                 _logger.LogInformation(
-                    "Message received from RabbitMQ. DeliveryTag: {DeliveryTag}, EventId: {EventId}, CorrelationId: {CorrelationId}",
+                    "Message received from RabbitMQ. DeliveryTag: {DeliveryTag}, EventId: {EventId}, CorrelationId: {CorrelationId}, RetryCount: {RetryCount}",
                     ea.DeliveryTag,
                     eventId,
-                    correlationId);
+                    correlationId,
+                    retryCount);
 
                 var integrationEvent = JsonSerializer.Deserialize<TransactionCreatedIntegrationEvent>(json)
                     ?? throw new InvalidOperationException("Failed to deserialize TransactionCreatedIntegrationEvent.");
@@ -113,25 +144,67 @@ public sealed class TransactionCreatedConsumerWorker : BackgroundService
                     multiple: false,
                     cancellationToken: stoppingToken);
 
+                _metrics.RecordSuccess(startedAt);
+
                 _logger.LogInformation(
                     "Message acknowledged successfully. DeliveryTag: {DeliveryTag}, EventId: {EventId}",
                     ea.DeliveryTag,
                     integrationEvent.EventId);
             }
-            catch (Exception ex)
+            catch (ConcurrentIdempotencyException)
             {
-                _logger.LogError(
-                    ex,
-                    "Failed to process RabbitMQ message. DeliveryTag: {DeliveryTag}, EventId: {EventId}, CorrelationId: {CorrelationId}",
-                    ea.DeliveryTag,
-                    eventId,
-                    correlationId);
-
-                await _channel.BasicNackAsync(
+                await _channel.BasicAckAsync(
                     deliveryTag: ea.DeliveryTag,
                     multiple: false,
-                    requeue: false,
                     cancellationToken: stoppingToken);
+
+                _metrics.RecordIdempotent(startedAt);
+
+                _logger.LogInformation(
+                    "Message acknowledged as concurrent idempotent. DeliveryTag: {DeliveryTag}, EventId: {EventId}",
+                    ea.DeliveryTag,
+                    eventId);
+            }
+            catch (Exception ex)
+            {
+                _metrics.RecordError(startedAt);
+
+                var nextRetryCount = retryCount + 1;
+
+                if (nextRetryCount > _options.MaxConsumerRetries)
+                {
+                    await _failurePublisher.PublishToDeadLetterAsync(
+                        payload: json,
+                        eventType: eventType,
+                        eventId: eventId,
+                        correlationId: correlationId,
+                        retryCount: nextRetryCount,
+                        reason: ex.Message,
+                        cancellationToken: stoppingToken);
+                }
+                else
+                {
+                    await _failurePublisher.PublishToRetryAsync(
+                        payload: json,
+                        eventType: eventType,
+                        eventId: eventId,
+                        correlationId: correlationId,
+                        retryCount: nextRetryCount,
+                        cancellationToken: stoppingToken);
+                }
+
+                await _channel.BasicAckAsync(
+                    deliveryTag: ea.DeliveryTag,
+                    multiple: false,
+                    cancellationToken: stoppingToken);
+
+                _logger.LogError(
+                    ex,
+                    "Failed to process RabbitMQ message. DeliveryTag: {DeliveryTag}, EventId: {EventId}, CorrelationId: {CorrelationId}, RetryCount: {RetryCount}",
+                    ea.DeliveryTag,
+                    eventId,
+                    correlationId,
+                    nextRetryCount);
             }
         };
 

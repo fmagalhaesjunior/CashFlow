@@ -10,7 +10,8 @@ public sealed class ProcessedEventConfiguration : IEntityTypeConfiguration<Proce
     {
         builder.ToTable("processed_events");
 
-        builder.HasKey(x => x.EventId);
+        builder.HasKey(x => x.EventId)
+            .HasName("pk_processed_events");
 
         builder.Property(x => x.EventId)
             .HasColumnName("event_id");

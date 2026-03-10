@@ -1,4 +1,5 @@
 ﻿using CashFlow.BalanceService.Application.Abstractions.Persistence;
+using CashFlow.BalanceService.Application.Exceptions;
 using CashFlow.BalanceService.Application.Extensions;
 using CashFlow.BalanceService.Application.Models;
 using CashFlow.BalanceService.Application.Parsers;
@@ -13,17 +14,20 @@ public sealed class ProcessTransactionCreatedService
     private readonly IDailyBalanceRepository _dailyBalanceRepository;
     private readonly IProcessedEventRepository _processedEventRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IUniqueConstraintDetector _uniqueConstraintDetector;
     private readonly ILogger<ProcessTransactionCreatedService> _logger;
 
     public ProcessTransactionCreatedService(
         IDailyBalanceRepository dailyBalanceRepository,
         IProcessedEventRepository processedEventRepository,
         IUnitOfWork unitOfWork,
+        IUniqueConstraintDetector uniqueConstraintDetector,
         ILogger<ProcessTransactionCreatedService> logger)
     {
         _dailyBalanceRepository = dailyBalanceRepository;
         _processedEventRepository = processedEventRepository;
         _unitOfWork = unitOfWork;
+        _uniqueConstraintDetector = uniqueConstraintDetector;
         _logger = logger;
     }
 
@@ -53,18 +57,14 @@ public sealed class ProcessTransactionCreatedService
         var balanceDate = DateOnly.FromDateTime(integrationEvent.Timestamp.UtcDateTimeSafe());
         var transactionType = TransactionTypeParser.Parse(integrationEvent.Type);
 
-        var dailyBalance = await _dailyBalanceRepository.GetByDateAsync(
-            balanceDate,
-            cancellationToken);
+        var dailyBalance = await _dailyBalanceRepository.GetByDateAsync(balanceDate, cancellationToken);
 
         if (dailyBalance is null)
         {
             dailyBalance = DailyBalance.Create(balanceDate);
             await _dailyBalanceRepository.AddAsync(dailyBalance, cancellationToken);
 
-            _logger.LogInformation(
-                "Daily balance created. Date: {Date}",
-                balanceDate);
+            _logger.LogInformation("Daily balance created. Date: {Date}", balanceDate);
         }
 
         switch (transactionType)
@@ -85,7 +85,18 @@ public sealed class ProcessTransactionCreatedService
             new ProcessedEvent(integrationEvent.EventId, DateTime.UtcNow),
             cancellationToken);
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex) when (_uniqueConstraintDetector.IsProcessedEventUniqueViolation(ex))
+        {
+            _logger.LogWarning(
+                "Concurrent idempotency detected. EventId: {EventId}",
+                integrationEvent.EventId);
+
+            throw new ConcurrentIdempotencyException(integrationEvent.EventId, ex);
+        }
 
         _logger.LogInformation(
             "Daily balance updated successfully. EventId: {EventId}, Date: {Date}, TotalCredit: {TotalCredit}, TotalDebit: {TotalDebit}, Balance: {Balance}",
