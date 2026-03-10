@@ -36,7 +36,24 @@ public sealed class OutboxEventConfiguration : IEntityTypeConfiguration<OutboxEv
         builder.Property(x => x.ProcessedAt)
             .HasColumnName("processed_at");
 
+        builder.Property(x => x.RetryCount)
+            .HasColumnName("retry_count")
+            .IsRequired();
+
+        builder.Property(x => x.LastError)
+            .HasColumnName("last_error")
+            .HasMaxLength(2000);
+
+        builder.Property(x => x.LastAttemptAt)
+            .HasColumnName("last_attempt_at");
+
+        builder.Property(x => x.NextAttemptAt)
+            .HasColumnName("next_attempt_at");
+
         builder.HasIndex(x => new { x.Processed, x.CreatedAt })
             .HasDatabaseName("ix_outbox_events_processed_created_at");
+
+        builder.HasIndex(x => new { x.Processed, x.NextAttemptAt })
+            .HasDatabaseName("ix_outbox_events_processed_next_attempt_at");
     }
 }

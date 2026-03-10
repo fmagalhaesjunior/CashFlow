@@ -1,7 +1,10 @@
 ﻿using CashFlow.TransactionService.Application.Abstractions;
 using CashFlow.TransactionService.Application.Abstractions.Messaging;
+using CashFlow.TransactionService.Application.Abstractions.Outbox;
 using CashFlow.TransactionService.Application.Abstractions.Persistence;
+using CashFlow.TransactionService.Infra.BackgroundJobs.Outbox;
 using CashFlow.TransactionService.Infra.Messaging;
+using CashFlow.TransactionService.Infra.Messaging.RabbitMq;
 using CashFlow.TransactionService.Infra.Persistence;
 using CashFlow.TransactionService.Infra.Repositories;
 using CashFlow.TransactionService.Infra.Services;
@@ -24,10 +27,21 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString);
         });
 
+        services.Configure<RabbitMqOptions>(
+            configuration.GetSection(RabbitMqOptions.SectionName));
+
+        services.Configure<OutboxPublisherOptions>(
+            configuration.GetSection(OutboxPublisherOptions.SectionName));
+
         services.AddScoped<ITransactionRepository, TransactionRepository>();
+        services.AddScoped<IOutboxRepository, OutboxRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IOutboxWriter, EfCoreOutboxWriter>();
+
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
+        services.AddSingleton<IIntegrationEventPublisher, RabbitMqIntegrationEventPublisher>();
+
+        services.AddHostedService<OutboxPublisherWorker>();
 
         return services;
     }
