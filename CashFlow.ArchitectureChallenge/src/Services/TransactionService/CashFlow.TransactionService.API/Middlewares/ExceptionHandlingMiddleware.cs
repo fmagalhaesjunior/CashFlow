@@ -1,6 +1,5 @@
 ﻿using CashFlow.BuildingBlocks.Domain.Abstractions;
 using FluentValidation;
-using System.Net;
 using System.Text.Json;
 
 namespace CashFlow.TransactionService.API.Middlewares;
@@ -26,7 +25,7 @@ public sealed class ExceptionHandlingMiddleware
         }
         catch (ValidationException ex)
         {
-            context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
             context.Response.ContentType = "application/json";
 
             var errors = ex.Errors
@@ -46,7 +45,7 @@ public sealed class ExceptionHandlingMiddleware
         }
         catch (DomainException ex)
         {
-            context.Response.StatusCode = (int)HttpStatusCode.UnprocessableEntity;
+            context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
             context.Response.ContentType = "application/json";
 
             var response = new
@@ -60,7 +59,7 @@ public sealed class ExceptionHandlingMiddleware
         {
             _logger.LogError(ex, "Unexpected error while processing request.");
 
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
             context.Response.ContentType = "application/json";
 
             var response = new

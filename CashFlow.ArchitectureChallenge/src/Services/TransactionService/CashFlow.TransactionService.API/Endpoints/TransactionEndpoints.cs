@@ -31,7 +31,9 @@ public static class TransactionEndpoints
             return Results.Created($"/transactions/{response.TransactionId}", response);
         })
         .WithName("CreateTransaction")
-        .WithTags("Transactions");
+        .WithTags("Transactions")
+        .Produces(StatusCodes.Status201Created)
+        .Produces(StatusCodes.Status500InternalServerError);
 
         return endpoints;
     }

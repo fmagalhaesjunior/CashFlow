@@ -267,18 +267,18 @@ Resposta esperada:
 
 ---
 
-# Swagger
+# Documentação API (Scalar)
 
 TransactionService
 
 ```
-http://localhost:8080/swagger
+http://localhost:8080/scalar
 ```
 
 BalanceService
 
 ```
-http://localhost:8081/swagger
+http://localhost:8081/scalar
 ```
 
 ---

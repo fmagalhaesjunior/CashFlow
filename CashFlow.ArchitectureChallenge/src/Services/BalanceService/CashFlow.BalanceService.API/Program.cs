@@ -2,6 +2,7 @@ using CashFlow.BalanceService.API.Endpoints;
 using CashFlow.BalanceService.Application;
 using CashFlow.BalanceService.Infrastructure;
 using OpenTelemetry.Metrics;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +28,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));

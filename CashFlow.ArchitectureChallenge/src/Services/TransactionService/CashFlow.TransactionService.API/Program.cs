@@ -2,6 +2,7 @@ using CashFlow.TransactionService.API.Endpoints;
 using CashFlow.TransactionService.API.Middlewares;
 using CashFlow.TransactionService.Application;
 using CashFlow.TransactionService.Infra;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,7 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.MapTransactionEndpoints();
