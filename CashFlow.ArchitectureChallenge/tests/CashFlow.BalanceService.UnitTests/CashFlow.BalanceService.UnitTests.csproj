@@ -18,8 +18,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\BuildingBlocks\CashFlow.BuildingBlocks.Contracts\CashFlow.BuildingBlocks.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\Services\TransactionService\CashFlow.TransactionService.Application\CashFlow.TransactionService.Application.csproj" />
-    <ProjectReference Include="..\..\src\Services\TransactionService\CashFlow.TransactionService.Domain\CashFlow.TransactionService.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Services\BalanceService\CashFlow.BalanceService.Application\CashFlow.BalanceService.Application.csproj" />
+    <ProjectReference Include="..\..\src\Services\BalanceService\CashFlow.BalanceService.Domain\CashFlow.BalanceService.Domain.csproj" />
     <ProjectReference Include="..\CashFlow.ArchitectureChallenge.TestCommon\CashFlow.ArchitectureChallenge.TestCommon.csproj" />
   </ItemGroup>
 
