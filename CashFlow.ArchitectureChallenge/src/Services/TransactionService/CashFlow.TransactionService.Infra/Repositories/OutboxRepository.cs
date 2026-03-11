@@ -23,7 +23,6 @@ public sealed class OutboxRepository : IOutboxRepository
         return await _dbContext.OutboxEvents
             .Where(x =>
                 (x.Status == OutboxStatus.Pending || x.Status == OutboxStatus.Failed) &&
-                !x.IsDeadLettered &&
                 (x.NextAttemptAt == null || x.NextAttemptAt <= utcNow))
             .OrderBy(x => x.CreatedAt)
             .Take(batchSize)
