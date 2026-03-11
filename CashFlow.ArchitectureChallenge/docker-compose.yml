@@ -1,0 +1,106 @@
+name: cashflow-architecture-challenge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cashflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: cashflow-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  transaction-service:
+    container_name: cashflow-transaction-service
+    build:
+      context: .
+      dockerfile: ./src/Services/TransactionService/CashFlow.TransactionService.API/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__TransactionDb: Host=postgres;Port=5432;Database=cashflow_transaction;Username=postgres;Password=postgres
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: guest
+      RabbitMq__Password: guest
+      RabbitMq__VirtualHost: /
+      RabbitMq__ExchangeName: cashflow.events
+      OutboxPublisher__BatchSize: 50
+      OutboxPublisher__PollingIntervalSeconds: 5
+      OutboxPublisher__MaxRetries: 5
+      OutboxPublisher__BaseRetryDelaySeconds: 10
+    ports:
+      - "8080:8080"
+
+  balance-service:
+    container_name: cashflow-balance-service
+    build:
+      context: .
+      dockerfile: ./src/Services/BalanceService/CashFlow.BalanceService.API/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__BalanceDb: Host=postgres;Port=5432;Database=cashflow_balance;Username=postgres;Password=postgres
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: guest
+      RabbitMq__Password: guest
+      RabbitMq__VirtualHost: /
+      RabbitMq__ExchangeName: cashflow.events
+      RabbitMq__QueueName: balance.transaction.created
+      RabbitMq__RoutingKey: transaction.created
+      RabbitMq__RetryExchangeName: cashflow.retry
+      RabbitMq__RetryQueueName: balance.transaction.created.retry
+      RabbitMq__RetryRoutingKey: transaction.created.retry
+      RabbitMq__DeadLetterExchangeName: cashflow.dlq
+      RabbitMq__DeadLetterQueueName: balance.transaction.created.dlq
+      RabbitMq__DeadLetterRoutingKey: transaction.created.dlq
+      RabbitMq__PrefetchCount: 50
+      RabbitMq__RetryDelayMilliseconds: 10000
+      RabbitMq__MaxConsumerRetries: 5
+    ports:
+      - "8081:8080"
+
+volumes:
+  postgres_data:
+  rabbitmq_data:

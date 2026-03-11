@@ -1,0 +1,2 @@
+CREATE DATABASE cashflow_transaction;
+CREATE DATABASE cashflow_balance;
