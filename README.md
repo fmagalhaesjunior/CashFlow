@@ -1,7 +1,7 @@
 # CashFlow Architecture Challenge
 
 ## Visão Geral
-Solução arquitetural em .NET 8 baseada em CQRS, Outbox Pattern, mensageria com RabbitMQ e processamento assíncrono para consolidação diária de saldo.
+Solução arquitetural em .NET 9 baseada em CQRS, Outbox Pattern, mensageria com RabbitMQ e processamento assíncrono para consolidação diária de saldo.
 
 ## Componentes
 - transaction-service
@@ -12,7 +12,7 @@ Solução arquitetural em .NET 8 baseada em CQRS, Outbox Pattern, mensageria com
 ## Requisitos
 - Docker
 - Docker Compose
-- .NET SDK 8
+- .NET SDK 9
 
 ## Subindo o ambiente
 ```bash
