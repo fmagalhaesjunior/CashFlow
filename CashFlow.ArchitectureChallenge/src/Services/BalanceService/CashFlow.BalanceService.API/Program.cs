@@ -1,3 +1,4 @@
+using CashFlow.BalanceService.API.Endpoints;
 using CashFlow.BalanceService.Application;
 using CashFlow.BalanceService.Infrastructure;
 using OpenTelemetry.Metrics;
@@ -29,5 +30,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapDailyBalanceEndpoints();
 
 app.Run();

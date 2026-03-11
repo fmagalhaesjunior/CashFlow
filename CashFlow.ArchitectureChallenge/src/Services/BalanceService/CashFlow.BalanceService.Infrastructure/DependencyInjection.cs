@@ -1,8 +1,10 @@
 ﻿using CashFlow.BalanceService.Application.Abstractions.Persistence;
+using CashFlow.BalanceService.Application.Abstractions.Queries;
 using CashFlow.BalanceService.Infrastructure.BackgroundJobs;
 using CashFlow.BalanceService.Infrastructure.Messaging.RabbitMq;
 using CashFlow.BalanceService.Infrastructure.Observability;
 using CashFlow.BalanceService.Infrastructure.Persistence;
+using CashFlow.BalanceService.Infrastructure.Queries;
 using CashFlow.BalanceService.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -29,8 +31,9 @@ public static class DependencyInjection
         services.AddScoped<IDailyBalanceRepository, DailyBalanceRepository>();
         services.AddScoped<IProcessedEventRepository, ProcessedEventRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddSingleton<IUniqueConstraintDetector, PostgresUniqueConstraintDetector>();
+        services.AddScoped<IDailyBalanceReadRepository, DailyBalanceReadRepository>();
 
+        services.AddSingleton<IUniqueConstraintDetector, PostgresUniqueConstraintDetector>();
         services.AddSingleton<BalanceConsumerMetrics>();
         services.AddSingleton<IConsumerFailurePublisher, ConsumerFailurePublisher>();
 
