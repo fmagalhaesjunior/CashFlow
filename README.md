@@ -1,7 +1,7 @@
 
 # CashFlow Architecture Challenge
 
-Solução arquitetural em **.NET 8** baseada em **CQRS, Outbox Pattern, mensageria com RabbitMQ e processamento assíncrono**, para controle de lançamentos financeiros e geração de saldo consolidado diário.
+Solução arquitetural em **.NET 9** baseada em **CQRS, Outbox Pattern, mensageria com RabbitMQ e processamento assíncrono**, para controle de lançamentos financeiros e geração de saldo consolidado diário.
 
 A arquitetura é composta por dois serviços principais:
 
@@ -21,7 +21,7 @@ docker compose up --build -d
 
 dotnet tool install --global dotnet-ef
 
-dotnet ef database update --project src/Services/TransactionService/CashFlow.TransactionService.Infrastructure --startup-project src/Services/TransactionService/CashFlow.TransactionService.API
+dotnet ef database update --project src/Services/TransactionService/CashFlow.TransactionService.Infra --startup-project src/Services/TransactionService/CashFlow.TransactionService.API
 
 dotnet ef database update --project src/Services/BalanceService/CashFlow.BalanceService.Infrastructure --startup-project src/Services/BalanceService/CashFlow.BalanceService.API
 ```
@@ -65,7 +65,7 @@ PostgreSQL | 5432 |
 
 # Tecnologias Utilizadas
 
-- .NET 8
+- .NET 9
 - ASP.NET Minimal APIs
 - Entity Framework Core
 - PostgreSQL
@@ -84,7 +84,7 @@ Antes de iniciar, certifique-se de ter instalado:
 
 - Docker
 - Docker Compose
-- .NET SDK 8
+- .NET SDK 9
 
 Verifique:
 
@@ -99,7 +99,7 @@ dotnet --version
 # 1. Clonar o repositório
 
 ```bash
-git clone https://github.com/seuusuario/cashflow-architecture-challenge.git
+git clone https://github.com/fmagalhaesjunior/CashFlow.git
 
 cd cashflow-architecture-challenge
 ```
@@ -146,7 +146,7 @@ dotnet ef --version
 # 4. Executar migrations do TransactionService
 
 ```bash
-dotnet ef database update --project src/Services/TransactionService/CashFlow.TransactionService.Infrastructure --startup-project src/Services/TransactionService/CashFlow.TransactionService.API
+dotnet ef database update --project src/Services/TransactionService/CashFlow.TransactionService.Infra --startup-project src/Services/TransactionService/CashFlow.TransactionService.API
 ```
 
 Tabelas criadas:
