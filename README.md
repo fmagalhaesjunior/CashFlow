@@ -29,8 +29,7 @@ dotnet ef database update --project src/Services/BalanceService/CashFlow.Balance
 ---
 
 # Arquitetura
-
-![Desenho Arquitetural](https://github.com/user-attachments/assets/3dbe0745-ac51-418c-a894-009b591861ec)
+<img width="871" height="843" alt="Desenho-Tecnico" src="https://github.com/user-attachments/assets/2fa1d8eb-07db-47b3-a1d8-3ac184b03df5" />
 
 
 Serviços e portas:
