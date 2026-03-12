@@ -1,23 +1,27 @@
-﻿using CashFlow.BalanceService.API;
-using CashFlow.BalanceService.Infrastructure.Persistence;
+﻿using CashFlow.BalanceService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Hosting;
 
-namespace CashFlow.BalanceService.IntegrationTests.Web;
+namespace CashFlow.ArchitectureChallenge.E2ETests.Web;
 
-public sealed class CustomBalanceWebApplicationFactory
-    : WebApplicationFactory<Program>
+public sealed class CustomBalanceE2EWebApplicationFactory
+    : WebApplicationFactory<BalanceService.API.Program>
 {
     private readonly string _connectionString;
+    private readonly string _rabbitMqHost;
+    private readonly int _rabbitMqPort;
 
-    public CustomBalanceWebApplicationFactory(string connectionString)
+    public CustomBalanceE2EWebApplicationFactory(
+        string connectionString,
+        string rabbitMqHost,
+        int rabbitMqPort)
     {
         _connectionString = connectionString;
+        _rabbitMqHost = rabbitMqHost;
+        _rabbitMqPort = rabbitMqPort;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -29,14 +33,23 @@ public sealed class CustomBalanceWebApplicationFactory
             var config = new Dictionary<string, string?>
             {
                 ["ConnectionStrings:BalanceDb"] = _connectionString,
-                ["RabbitMq:HostName"] = "localhost",
-                ["RabbitMq:Port"] = "5672",
+                ["RabbitMq:HostName"] = _rabbitMqHost,
+                ["RabbitMq:Port"] = _rabbitMqPort.ToString(),
                 ["RabbitMq:UserName"] = "guest",
                 ["RabbitMq:Password"] = "guest",
                 ["RabbitMq:VirtualHost"] = "/",
                 ["RabbitMq:ExchangeName"] = "cashflow.events",
                 ["RabbitMq:QueueName"] = "balance.transaction.created",
-                ["RabbitMq:RoutingKey"] = "transaction.created"
+                ["RabbitMq:RoutingKey"] = "transaction.created",
+                ["RabbitMq:RetryExchangeName"] = "cashflow.retry",
+                ["RabbitMq:RetryQueueName"] = "balance.transaction.created.retry",
+                ["RabbitMq:RetryRoutingKey"] = "transaction.created.retry",
+                ["RabbitMq:DeadLetterExchangeName"] = "cashflow.dlq",
+                ["RabbitMq:DeadLetterQueueName"] = "balance.transaction.created.dlq",
+                ["RabbitMq:DeadLetterRoutingKey"] = "transaction.created.dlq",
+                ["RabbitMq:PrefetchCount"] = "10",
+                ["RabbitMq:RetryDelayMilliseconds"] = "1000",
+                ["RabbitMq:MaxConsumerRetries"] = "3"
             };
 
             configBuilder.AddInMemoryCollection(config);
@@ -44,8 +57,6 @@ public sealed class CustomBalanceWebApplicationFactory
 
         builder.ConfigureServices(services =>
         {
-            services.RemoveAll<IHostedService>();
-
             var descriptor = services.SingleOrDefault(
                 d => d.ServiceType == typeof(DbContextOptions<BalanceDbContext>));
 

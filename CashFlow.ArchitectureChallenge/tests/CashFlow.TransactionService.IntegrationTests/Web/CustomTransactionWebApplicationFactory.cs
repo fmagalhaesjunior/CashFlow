@@ -1,4 +1,5 @@
-﻿using CashFlow.TransactionService.Infra.Persistence;
+﻿using CashFlow.TransactionService.API;
+using CashFlow.TransactionService.Infra.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
