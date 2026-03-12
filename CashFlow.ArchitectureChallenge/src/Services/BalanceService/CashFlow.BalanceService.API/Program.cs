@@ -35,3 +35,5 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 app.MapDailyBalanceEndpoints();
 
 app.Run();
+
+public partial class Program;
