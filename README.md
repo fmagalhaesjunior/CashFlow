@@ -30,26 +30,8 @@ dotnet ef database update --project src/Services/BalanceService/CashFlow.Balance
 
 # Arquitetura
 
-```
-POST /transactions
-        |
-        v
-TransactionService
-        |
-        | grava transaction + outbox
-        v
-Outbox Publisher
-        |
-        v
-RabbitMQ
-        |
-        v
-BalanceService Consumer
-        |
-        | atualiza daily_balance
-        v
-GET /daily-balance/{date}
-```
+![Desenho Arquitetural](https://github.com/user-attachments/assets/3dbe0745-ac51-418c-a894-009b591861ec)
+
 
 Serviços e portas:
 
